@@ -343,7 +343,7 @@ typedef struct
 }trace_cnt;
 /* Record find new path cnt */
 
-int seet_len;
+int seed_len;
 
 #define SEED_LIMIT 65535
 trace_cnt all_trace_cnt[SEED_LIMIT];
@@ -366,8 +366,18 @@ gfsr4_state_t;
 
 gfsr4_state_t *rng_state;
 
-static inline unsigned long
-gfsr4_get (void *vstate)
+
+void init_all_trace_cnt()
+{
+  for (int i = 0; i < SEED_LIMIT; i++)
+  {
+    all_trace_cnt[i].fail_cnt = 10;
+    all_trace_cnt[i].suc_cnt = 10;
+  }
+}
+
+
+unsigned long gfsr4_get (void *vstate)
 {
   gfsr4_state_t *state = (gfsr4_state_t *) vstate;
 
@@ -482,7 +492,7 @@ void select_migrate_pos()
 {
   double tmp, res = 0;
   int res_pos = 0;
-  
+
   for (int i = 0; i < 0; i++)
   {
     if ((tmp = generate_beta(all_trace_cnt[i].fail_cnt, all_trace_cnt[i].suc_cnt)) > res)
@@ -5221,8 +5231,7 @@ static u8 fuzz_one(char** argv) {
 
   if (fd < 0) PFATAL("Unable to open '%s'", queue_cur->fname);
 
-  len = queue_cur->len;
-
+  seed_len = len = queue_cur->len;
   orig_in = in_buf = mmap(0, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 
   if (orig_in == MAP_FAILED) PFATAL("Unable to mmap '%s'", queue_cur->fname);
@@ -8239,6 +8248,7 @@ int main(int argc, char** argv) {
 
   rng_state = calloc(1, sizeof(gfsr4_state_t));
   gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
+  init_all_trace_cnt();
 
   if (stop_soon) goto stop_fuzzing;
 
