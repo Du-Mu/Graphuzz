@@ -336,6 +336,165 @@ enum {
   /* 05 */ FAULT_NOBITS
 };
 
+typedef struct
+{
+  unsigned int fail_cnt;
+  unsigned int suc_cnt;
+}trace_cnt;
+/* Record find new path cnt */
+
+int seet_len;
+
+#define SEED_LIMIT 65535
+trace_cnt all_trace_cnt[SEED_LIMIT];
+
+/* Magic numbers */
+#define A 471
+#define B 1586
+#define C 6988
+#define D 9689
+#define M 16383 /* = 2^14-1 */
+/* #define M 0x0003fff */
+
+typedef struct
+  {
+    int nd;
+    unsigned long ra[M+1];
+  }
+gfsr4_state_t;
+
+
+gfsr4_state_t *rng_state;
+
+static inline unsigned long
+gfsr4_get (void *vstate)
+{
+  gfsr4_state_t *state = (gfsr4_state_t *) vstate;
+
+  state->nd = ((state->nd)+1)&M;
+  return state->ra[(state->nd)] =
+      state->ra[((state->nd)+(M+1-A))&M]^
+      state->ra[((state->nd)+(M+1-B))&M]^
+      state->ra[((state->nd)+(M+1-C))&M]^
+      state->ra[((state->nd)+(M+1-D))&M];
+  
+}
+
+static double
+gfsr4_get_double (void * vstate)
+{
+  return gfsr4_get (vstate) / 4294967296.0 ;
+}
+
+static void
+gfsr4_set (void *vstate, unsigned long int s)
+{
+  gfsr4_state_t *state = (gfsr4_state_t *) vstate;
+  int i, j;
+  /* Masks for turning on the diagonal bit and turning off the
+     leftmost bits */
+  unsigned long int msb = 0x80000000UL;
+  unsigned long int mask = 0xffffffffUL;
+
+  if (s == 0)
+    s = 4357;   /* the default seed is 4357 */
+
+  /* We use the congruence s_{n+1} = (69069*s_n) mod 2^32 to
+     initialize the state. This works because ANSI-C unsigned long
+     integer arithmetic is automatically modulo 2^32 (or a higher
+     power of two), so we can safely ignore overflow. */
+
+#define LCG(n) ((69069 * n) & 0xffffffffUL)
+
+  /* Brian Gough suggests this to avoid low-order bit correlations */
+  for (i = 0; i <= M; i++)
+    {
+      unsigned long t = 0 ;
+      unsigned long bit = msb ;
+      for (j = 0; j < 32; j++)
+        {
+          s = LCG(s) ;
+          if (s & msb) 
+            t |= bit ;
+          bit >>= 1 ;
+        }
+      state->ra[i] = t ;
+    }
+
+  /* Perform the "orthogonalization" of the matrix */
+  /* Based on the orthogonalization used in r250, as suggested initially
+   * by Kirkpatrick and Stoll, and pointed out to me by Brian Gough
+   */
+
+  /* BJG: note that this orthogonalisation doesn't have any effect
+     here because the the initial 6695 elements do not participate in
+     the calculation.  For practical purposes this orthogonalisation
+     is somewhat irrelevant, because the probability of the original
+     sequence being degenerate should be exponentially small. */
+
+  for (i=0; i<32; ++i) {
+      int k=7+i*3;
+      state->ra[k] &= mask;     /* Turn off bits left of the diagonal */
+      state->ra[k] |= msb;      /* Turn on the diagonal bit           */
+      mask >>= 1;
+      msb >>= 1;
+  }
+
+  state->nd = i;
+}
+
+double generate_gamma(int num)
+{
+	double tmp1, tmp2, tmp3;
+	double r_n_1, r_n_2, V, Y, Z, W;
+
+	tmp1 = 1/sqrt(2 * num -1);
+	tmp2 = num - log(4);
+    tmp3 = num + 1/tmp1;
+	while (1)
+	{
+		r_n_1 = gfsr4_get_double(rng_state);
+		r_n_2 = gfsr4_get_double(rng_state);
+
+		V = tmp1 * log(r_n_1/(1-r_n_1));
+		Y = num * exp(V);
+		Z = pow(r_n_1, 2)*r_n_2;
+		W = tmp2 + tmp3 * V - Y;
+		if (W + 1 + log(4.5) - 4.5 * Z >= 0)
+			return Y;
+		if (W >= log(Z))
+			return Y;
+		
+	}
+}
+double generate_beta(int a, int b)
+{
+	double gamma_1, gamma_2;
+
+	gamma_1 = generate_gamma(a);
+	gamma_2 = generate_gamma(b);
+
+	return gamma_1/(gamma_1+gamma_2);
+}
+
+
+void select_migrate_pos()
+{
+  double tmp, res = 0;
+  int res_pos = 0;
+  
+  for (int i = 0; i < 0; i++)
+  {
+    if ((tmp = generate_beta(all_trace_cnt[i].fail_cnt, all_trace_cnt[i].suc_cnt)) > res)
+    {
+      res = tmp;
+      res_pos = i;
+    }
+  }
+
+  return res_pos;
+}
+
 
 /* Get unix time in milliseconds */
 
@@ -8078,6 +8237,9 @@ int main(int argc, char** argv) {
   write_stats_file(0, 0, 0);
   save_auto();
 
+  rng_state = calloc(1, sizeof(gfsr4_state_t));
+  gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
+
   if (stop_soon) goto stop_fuzzing;
 
   /* Woop woop woop */
@@ -8181,6 +8343,7 @@ stop_fuzzing:
   }
 
   fclose(plot_file);
+  free(rng_state);
   destroy_queue();
   destroy_extras();
   ck_free(target_path);
