@@ -56,6 +56,7 @@
 #include <termios.h>
 #include <dlfcn.h>
 #include <sched.h>
+#include <math.h>
 
 #include <sys/wait.h>
 #include <sys/time.h>
@@ -338,16 +339,19 @@ enum {
 
 typedef struct
 {
-  unsigned int fail_cnt;
-  unsigned int suc_cnt;
+  unsigned long int fail_cnt;
+  unsigned long int suc_cnt;
 }trace_cnt;
 /* Record find new path cnt */
 
 int seed_len;
 
+int is_in_havoc = 0;
+
 #define SEED_LIMIT 65535
 trace_cnt all_trace_cnt[SEED_LIMIT];
 
+int selected_pos_cnt[SEED_LIMIT] = {0};
 /* Magic numbers */
 #define A 471
 #define B 1586
@@ -372,7 +376,7 @@ void init_all_trace_cnt()
   for (int i = 0; i < SEED_LIMIT; i++)
   {
     all_trace_cnt[i].fail_cnt = 10;
-    all_trace_cnt[i].suc_cnt = 10;
+    all_trace_cnt[i].suc_cnt = 100;
   }
 }
 
@@ -488,12 +492,12 @@ double generate_beta(int a, int b)
 }
 
 
-void select_migrate_pos()
+u32 select_migrate_pos(u32 len)
 {
   double tmp, res = 0;
-  int res_pos = 0;
+  u32 res_pos = 0;
 
-  for (int i = 0; i < 0; i++)
+  for (u32 i = 0; i < len; i++)
   {
     if ((tmp = generate_beta(all_trace_cnt[i].fail_cnt, all_trace_cnt[i].suc_cnt)) > res)
     {
@@ -4854,8 +4858,19 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   }
 
   /* This handles FAULT_ERROR for us: */
-
-  queued_discovered += save_if_interesting(argv, out_buf, len, fault);
+  if (is_in_havoc)
+  {
+    if (save_if_interesting(argv, out_buf, len, fault))
+    {
+      for (int i = 0; i < seed_len; i++)
+        all_trace_cnt[i].suc_cnt += selected_pos_cnt[i]*10;
+    }
+      else
+        for (int i = 0; i < seed_len; i++)
+          all_trace_cnt[i].suc_cnt += selected_pos_cnt[i];
+  }
+  else
+    queued_discovered += save_if_interesting(argv, out_buf, len, fault);
 
   if (!(stage_cur % stats_update_freq) || stage_cur + 1 == stage_max)
     show_stats();
@@ -5169,6 +5184,9 @@ static u8 could_be_interest(u32 old_val, u32 new_val, u8 blen, u8 check_le) {
    function is a tad too long... returns 0 if fuzzed successfully, 1 if
    skipped or bailed out. */
 
+/// @brief 
+/// @param argv 
+/// @return 
 static u8 fuzz_one(char** argv) {
 
   s32 len, fd, temp_len, i, j;
@@ -6330,20 +6348,24 @@ havoc_stage:
  
     for (i = 0; i < use_stacking; i++) {
 
+      u32 pos;
+
       switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
         case 0:
 
           /* Flip a single bit somewhere. Spooky! */
-
-          FLIP_BIT(out_buf, UR(temp_len << 3));
+          pos = select_migrate_pos(temp_len<<3);
+          selected_pos_cnt[pos>>3]++;
+          FLIP_BIT(out_buf, pos);
           break;
 
         case 1: 
 
           /* Set byte to interesting value. */
-
-          out_buf[UR(temp_len)] = interesting_8[UR(sizeof(interesting_8))];
+          pos = select_migrate_pos(temp_len);
+          out_buf[pos] = interesting_8[UR(sizeof(interesting_8))];
+          selected_pos_cnt[pos]++;
           break;
 
         case 2:
@@ -6352,17 +6374,21 @@ havoc_stage:
 
           if (temp_len < 2) break;
 
+          pos = select_migrate_pos(temp_len-1);
+
           if (UR(2)) {
 
-            *(u16*)(out_buf + UR(temp_len - 1)) =
+            *(u16*)(out_buf + pos) =
               interesting_16[UR(sizeof(interesting_16) >> 1)];
 
           } else {
 
-            *(u16*)(out_buf + UR(temp_len - 1)) = SWAP16(
+            *(u16*)(out_buf + pos) = SWAP16(
               interesting_16[UR(sizeof(interesting_16) >> 1)]);
 
           }
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
 
           break;
 
@@ -6371,105 +6397,108 @@ havoc_stage:
           /* Set dword to interesting value, randomly choosing endian. */
 
           if (temp_len < 4) break;
+          pos = select_migrate_pos(temp_len-3);
 
           if (UR(2)) {
   
-            *(u32*)(out_buf + UR(temp_len - 3)) =
+            *(u32*)(out_buf + pos) =
               interesting_32[UR(sizeof(interesting_32) >> 2)];
 
           } else {
 
-            *(u32*)(out_buf + UR(temp_len - 3)) = SWAP32(
+            *(u32*)(out_buf + pos) = SWAP32(
               interesting_32[UR(sizeof(interesting_32) >> 2)]);
 
           }
-
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
+          selected_pos_cnt[pos+2]++;
+          selected_pos_cnt[pos+3]++;
           break;
 
         case 4:
 
           /* Randomly subtract from byte. */
-
-          out_buf[UR(temp_len)] -= 1 + UR(ARITH_MAX);
+          pos = select_migrate_pos(temp_len);
+          out_buf[pos] -= 1 + UR(ARITH_MAX);
+          selected_pos_cnt[pos]++;
           break;
 
         case 5:
 
           /* Randomly add to byte. */
-
-          out_buf[UR(temp_len)] += 1 + UR(ARITH_MAX);
+          pos = select_migrate_pos(temp_len);
+          out_buf[pos] += 1 + UR(ARITH_MAX);
           break;
 
         case 6:
 
           /* Randomly subtract from word, random endian. */
-
           if (temp_len < 2) break;
 
-          if (UR(2)) {
+          pos = select_migrate_pos(temp_len-1);
 
-            u32 pos = UR(temp_len - 1);
+          if (UR(2)) {
 
             *(u16*)(out_buf + pos) -= 1 + UR(ARITH_MAX);
 
           } else {
 
-            u32 pos = UR(temp_len - 1);
             u16 num = 1 + UR(ARITH_MAX);
 
             *(u16*)(out_buf + pos) =
               SWAP16(SWAP16(*(u16*)(out_buf + pos)) - num);
 
           }
-
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
           break;
 
         case 7:
 
           /* Randomly add to word, random endian. */
-
+          pos = select_migrate_pos(temp_len-1);
           if (temp_len < 2) break;
 
           if (UR(2)) {
 
-            u32 pos = UR(temp_len - 1);
 
             *(u16*)(out_buf + pos) += 1 + UR(ARITH_MAX);
 
           } else {
 
-            u32 pos = UR(temp_len - 1);
             u16 num = 1 + UR(ARITH_MAX);
 
             *(u16*)(out_buf + pos) =
               SWAP16(SWAP16(*(u16*)(out_buf + pos)) + num);
 
           }
-
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
           break;
 
         case 8:
 
           /* Randomly subtract from dword, random endian. */
-
+        
           if (temp_len < 4) break;
-
+          pos = select_migrate_pos(temp_len-3);
           if (UR(2)) {
-
-            u32 pos = UR(temp_len - 3);
 
             *(u32*)(out_buf + pos) -= 1 + UR(ARITH_MAX);
 
           } else {
 
-            u32 pos = UR(temp_len - 3);
             u32 num = 1 + UR(ARITH_MAX);
 
             *(u32*)(out_buf + pos) =
               SWAP32(SWAP32(*(u32*)(out_buf + pos)) - num);
 
           }
-
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
+          selected_pos_cnt[pos+2]++;
+          selected_pos_cnt[pos+3]++;
           break;
 
         case 9:
@@ -6477,23 +6506,23 @@ havoc_stage:
           /* Randomly add to dword, random endian. */
 
           if (temp_len < 4) break;
-
+          pos = select_migrate_pos(temp_len-3);
           if (UR(2)) {
-
-            u32 pos = UR(temp_len - 3);
 
             *(u32*)(out_buf + pos) += 1 + UR(ARITH_MAX);
 
           } else {
 
-            u32 pos = UR(temp_len - 3);
             u32 num = 1 + UR(ARITH_MAX);
 
             *(u32*)(out_buf + pos) =
               SWAP32(SWAP32(*(u32*)(out_buf + pos)) + num);
 
           }
-
+          selected_pos_cnt[pos]++;
+          selected_pos_cnt[pos+1]++;
+          selected_pos_cnt[pos+2]++;
+          selected_pos_cnt[pos+3]++;
           break;
 
         case 10:
@@ -6501,8 +6530,9 @@ havoc_stage:
           /* Just set a random byte to a random value. Because,
              why not. We use XOR with 1-255 to eliminate the
              possibility of a no-op. */
-
-          out_buf[UR(temp_len)] ^= 1 + UR(255);
+          pos = select_migrate_pos(temp_len);
+          out_buf[pos] ^= 1 + UR(255);
+          selected_pos_cnt[pos]++;
           break;
 
         case 11 ... 12: {
@@ -6519,12 +6549,14 @@ havoc_stage:
 
             del_len = choose_block_len(temp_len - 1);
 
-            del_from = UR(temp_len - del_len + 1);
+            del_from = select_migrate_pos(temp_len - del_len + 1);
 
             memmove(out_buf + del_from, out_buf + del_from + del_len,
                     temp_len - del_from - del_len);
 
             temp_len -= del_len;
+            for (int i = 0; i < del_len; i++)
+              selected_pos_cnt[del_from+i]++;
 
             break;
 
@@ -6543,7 +6575,7 @@ havoc_stage:
             if (actually_clone) {
 
               clone_len  = choose_block_len(temp_len);
-              clone_from = UR(temp_len - clone_len + 1);
+              clone_from = select_migrate_pos(temp_len - clone_len + 1);
 
             } else {
 
@@ -6576,6 +6608,8 @@ havoc_stage:
             out_buf = new_buf;
             temp_len += clone_len;
 
+            for (int i = clone_to; i < temp_len; i++) selected_pos_cnt[i]++;
+
           }
 
           break;
@@ -6591,7 +6625,7 @@ havoc_stage:
 
             copy_len  = choose_block_len(temp_len - 1);
 
-            copy_from = UR(temp_len - copy_len + 1);
+            copy_from = select_migrate_pos(temp_len - copy_len + 1);
             copy_to   = UR(temp_len - copy_len + 1);
 
             if (UR(4)) {
@@ -6603,6 +6637,8 @@ havoc_stage:
                           UR(2) ? UR(256) : out_buf[UR(temp_len)], copy_len);
 
             break;
+
+            for (int i = 0; i < copy_len; i++) selected_pos_cnt[i+copy_from]++;
 
           }
 
@@ -6624,8 +6660,10 @@ havoc_stage:
 
               if (extra_len > temp_len) break;
 
-              insert_at = UR(temp_len - extra_len + 1);
+              insert_at = select_migrate_pos(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, a_extras[use_extra].data, extra_len);
+
+              for (int i = 0; i < extra_len; i++) selected_pos_cnt[insert_at+i]++;
 
             } else {
 
@@ -6637,8 +6675,10 @@ havoc_stage:
 
               if (extra_len > temp_len) break;
 
-              insert_at = UR(temp_len - extra_len + 1);
+              insert_at = select_migrate_pos(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, extras[use_extra].data, extra_len);
+
+              for (int i = 0; i < extra_len; i++) selected_pos_cnt[insert_at+i]++;
 
             }
 
@@ -6648,7 +6688,7 @@ havoc_stage:
 
         case 16: {
 
-            u32 use_extra, extra_len, insert_at = UR(temp_len + 1);
+            u32 use_extra, extra_len, insert_at = select_migrate_pos(temp_len + 1);
             u8* new_buf;
 
             /* Insert an extra. Do the same dice-rolling stuff as for the
@@ -6693,6 +6733,7 @@ havoc_stage:
             ck_free(out_buf);
             out_buf   = new_buf;
             temp_len += extra_len;
+            for (int i = insert_at; i < temp_len; i++) selected_pos_cnt[i]++; 
 
             break;
 
@@ -6701,12 +6742,17 @@ havoc_stage:
       }
 
     }
-
+    is_in_havoc = 1;
+    seed_len = temp_len;
     if (common_fuzz_stuff(argv, out_buf, temp_len))
+    {
+      is_in_havoc = 0;
       goto abandon_entry;
-
+    }
     /* out_buf might have been mangled a bit, so let's restore it to its
        original size and shape. */
+
+    is_in_havoc = 0;
 
     if (temp_len < len) out_buf = ck_realloc(out_buf, len);
     temp_len = len;
@@ -8261,6 +8307,8 @@ int main(int argc, char** argv) {
   }
 
   while (1) {
+
+    memset(all_trace_cnt, 0, sizeof(trace_cnt)*SEED_LIMIT);
 
     u8 skipped_fuzz;
 
