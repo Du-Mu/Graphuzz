@@ -6358,7 +6358,6 @@ havoc_stage:
     for (i = 0; i < use_stacking; i++) {
 
       u32 pos = 0;
-      printf("pos = %lu", pos);
 
       switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
@@ -6750,6 +6749,7 @@ havoc_stage:
           }
 
       }
+      printf("pos = %lu", pos);
 
     }
     is_in_havoc = 1;
