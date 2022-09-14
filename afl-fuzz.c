@@ -4869,13 +4869,14 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     else
       for (int i = 0; i < seed_len; i++)
         all_trace_cnt[i].fail_cnt += selected_pos_cnt[i];
-    
+    /*
     memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
     for (int i = 0; i < seed_len; i++)
     {
       printf("suc=%lu fail=%lu\t", all_trace_cnt[i].suc_cnt,all_trace_cnt[i].fail_cnt);
     }
     putchar('\n');
+    */
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
@@ -6356,7 +6357,8 @@ havoc_stage:
  
     for (i = 0; i < use_stacking; i++) {
 
-      u32 pos;
+      u32 pos = 0;
+      printf("pos = %lu", pos);
 
       switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
