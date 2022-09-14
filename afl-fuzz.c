@@ -375,8 +375,8 @@ void init_all_trace_cnt()
 {
   for (int i = 0; i < SEED_LIMIT; i++)
   {
-    all_trace_cnt[i].fail_cnt = 10;
-    all_trace_cnt[i].suc_cnt = 100;
+    all_trace_cnt[i].fail_cnt = 100;
+    all_trace_cnt[i].suc_cnt = 10;
   }
 }
 
@@ -4863,11 +4863,11 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     if (save_if_interesting(argv, out_buf, len, fault))
     {
       for (int i = 0; i < seed_len; i++)
-        all_trace_cnt[i].suc_cnt += selected_pos_cnt[i]*10;
+        all_trace_cnt[i].suc_cnt += selected_pos_cnt[i];
     }
-      else
-        for (int i = 0; i < seed_len; i++)
-          all_trace_cnt[i].suc_cnt += selected_pos_cnt[i];
+    else
+      for (int i = 0; i < seed_len; i++)
+        all_trace_cnt[i].fail_cnt += selected_pos_cnt[i];
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
