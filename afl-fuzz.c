@@ -500,7 +500,7 @@ u32 select_migrate_pos(u32 len)
 
   for (u32 i = 0; i < len; i++)
   {
-    if ((tmp = generate_beta(all_trace_cnt[i].fail_cnt, all_trace_cnt[i].suc_cnt)) > res)
+    if ((tmp = generate_beta(all_trace_cnt[i].suc_cnt, all_trace_cnt[i].fail_cnt)) > res)
     {
       res = tmp;
       res_pos = i;
