@@ -4872,8 +4872,9 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
     for (int i = 0; i < seed_len; i++)
     {
-      printf("suc=%lu fail=%lu,", all_trace_cnt[i].suc_cnt,all_trace_cnt[i].fail_cnt);
+      printf("suc=%lu fail=%lu\t", all_trace_cnt[i].suc_cnt,all_trace_cnt[i].fail_cnt);
     }
+    putchar('\n');
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
