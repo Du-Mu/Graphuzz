@@ -4869,7 +4869,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
       for (int i = 0; i < seed_len; i++)
         all_trace_cnt[i].fail_cnt += selected_pos_cnt[i];
     
-    memset(all_trace_cnt, 0, sizeof(trace_cnt)*SEED_LIMIT);
+    memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
@@ -8311,7 +8311,7 @@ int main(int argc, char** argv) {
 
   while (1) {
 
-    memset(all_trace_cnt, 0, sizeof(trace_cnt)*SEED_LIMIT);
+    memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
 
     u8 skipped_fuzz;
 
