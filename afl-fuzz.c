@@ -8258,6 +8258,11 @@ int main(int argc, char** argv) {
   setup_shm();
   init_count_class16();
 
+  rng_state = calloc(1, sizeof(gfsr4_state_t));
+  gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
+  init_all_trace_cnt();
+
+
   setup_dirs_fds();
   read_testcases();
   load_auto();
@@ -8291,10 +8296,6 @@ int main(int argc, char** argv) {
 
   write_stats_file(0, 0, 0);
   save_auto();
-
-  rng_state = calloc(1, sizeof(gfsr4_state_t));
-  gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
-  init_all_trace_cnt();
 
   if (stop_soon) goto stop_fuzzing;
 
