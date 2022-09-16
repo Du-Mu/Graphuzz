@@ -6373,7 +6373,7 @@ havoc_stage:
           mig_select = UR(4) + 13;
 
       }
-      switch (UR(11)) {// + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
+      switch (mig_select) {// + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
         case 0:
 
