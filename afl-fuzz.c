@@ -348,11 +348,11 @@ int seed_len;
 
 int is_in_havoc = 0;
 int is_in_main_cycle = 0;
-
+unsigned int all_havoc_mig_cnt = 0;
 #define SEED_LIMIT 65535
 trace_cnt all_trace_cnt[SEED_LIMIT];
-
-int selected_pos_cnt[SEED_LIMIT] = {0};
+unsigned int stack_top = 0;
+unsigned int selected_pos_stack[SEED_LIMIT] = {0};
 /* Magic numbers */
 #define A 471
 #define B 1586
@@ -4863,12 +4863,17 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   {
     if (save_if_interesting(argv, out_buf, len, fault))
     {
-      for (int i = 0; i < seed_len; i++)
-        all_trace_cnt[i].suc_cnt += selected_pos_cnt[i];
+      queued_discovered++;
+      while (stack_top > 0)
+      {
+        all_trace_cnt[selected_pos_stack[stack_top--]].suc_cnt ++; 
+      }
     }
     else
-      for (int i = 0; i < seed_len; i++)
-        all_trace_cnt[i].fail_cnt += selected_pos_cnt[i];
+      while (stack_top > 0)
+      {
+        all_trace_cnt[selected_pos_stack[stack_top--]].fail_cnt ++;
+      }
     /*
     memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
     for (int i = 0; i < seed_len; i++)
@@ -6354,18 +6359,27 @@ havoc_stage:
     u32 use_stacking = 1 << (1 + UR(HAVOC_STACK_POW2));
 
     stage_cur_val = use_stacking;
- 
+    stack_top = 0;
     for (i = 0; i < use_stacking; i++) {
 
       u32 pos = 0;
+      u32 mig_select = UR(11);
+      if (all_havoc_mig_cnt > 100 * temp_len)
+      {
+        all_havoc_mig_cnt = 0;
+        if (temp_len >= 1024)
+          mig_select = UR(6) + 11;
+        else
+          mig_select = UR(4) + 13;
 
-      switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
+      }
+      switch (UR(11)) {// + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
         case 0:
 
           /* Flip a single bit somewhere. Spooky! */
           pos = select_migrate_pos(temp_len<<3);
-          selected_pos_cnt[pos>>3]++;
+          selected_pos_stack[stack_top++] = pos>>3;
           FLIP_BIT(out_buf, pos);
           break;
 
@@ -6374,7 +6388,7 @@ havoc_stage:
           /* Set byte to interesting value. */
           pos = select_migrate_pos(temp_len);
           out_buf[pos] = interesting_8[UR(sizeof(interesting_8))];
-          selected_pos_cnt[pos]++;
+          selected_pos_stack[stack_top++] = pos;
           break;
 
         case 2:
@@ -6396,8 +6410,8 @@ havoc_stage:
               interesting_16[UR(sizeof(interesting_16) >> 1)]);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
 
           break;
 
@@ -6419,10 +6433,10 @@ havoc_stage:
               interesting_32[UR(sizeof(interesting_32) >> 2)]);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
-          selected_pos_cnt[pos+2]++;
-          selected_pos_cnt[pos+3]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
+          selected_pos_stack[stack_top++] = pos+2;
+          selected_pos_stack[stack_top++] = pos+3;
           break;
 
         case 4:
@@ -6430,7 +6444,7 @@ havoc_stage:
           /* Randomly subtract from byte. */
           pos = select_migrate_pos(temp_len);
           out_buf[pos] -= 1 + UR(ARITH_MAX);
-          selected_pos_cnt[pos]++;
+          selected_pos_stack[stack_top++] = pos;
           break;
 
         case 5:
@@ -6438,6 +6452,7 @@ havoc_stage:
           /* Randomly add to byte. */
           pos = select_migrate_pos(temp_len);
           out_buf[pos] += 1 + UR(ARITH_MAX);
+          selected_pos_stack[stack_top++] = pos;
           break;
 
         case 6:
@@ -6459,8 +6474,8 @@ havoc_stage:
               SWAP16(SWAP16(*(u16*)(out_buf + pos)) - num);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
           break;
 
         case 7:
@@ -6482,8 +6497,8 @@ havoc_stage:
               SWAP16(SWAP16(*(u16*)(out_buf + pos)) + num);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
           break;
 
         case 8:
@@ -6504,10 +6519,10 @@ havoc_stage:
               SWAP32(SWAP32(*(u32*)(out_buf + pos)) - num);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
-          selected_pos_cnt[pos+2]++;
-          selected_pos_cnt[pos+3]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
+          selected_pos_stack[stack_top++] = pos+2;
+          selected_pos_stack[stack_top++] = pos+3;
           break;
 
         case 9:
@@ -6528,10 +6543,10 @@ havoc_stage:
               SWAP32(SWAP32(*(u32*)(out_buf + pos)) + num);
 
           }
-          selected_pos_cnt[pos]++;
-          selected_pos_cnt[pos+1]++;
-          selected_pos_cnt[pos+2]++;
-          selected_pos_cnt[pos+3]++;
+          selected_pos_stack[stack_top++] = pos;
+          selected_pos_stack[stack_top++] = pos+1;
+          selected_pos_stack[stack_top++] = pos+2;
+          selected_pos_stack[stack_top++] = pos+3;
           break;
 
         case 10:
@@ -6541,7 +6556,7 @@ havoc_stage:
              possibility of a no-op. */
           pos = select_migrate_pos(temp_len);
           out_buf[pos] ^= 1 + UR(255);
-          selected_pos_cnt[pos]++;
+          selected_pos_stack[stack_top++] = pos;
           break;
 
         case 11 ... 12: {
@@ -6564,8 +6579,6 @@ havoc_stage:
                     temp_len - del_from - del_len);
 
             temp_len -= del_len;
-            for (int i = 0; i < del_len; i++)
-              selected_pos_cnt[del_from+i]++;
 
             break;
 
@@ -6617,8 +6630,6 @@ havoc_stage:
             out_buf = new_buf;
             temp_len += clone_len;
 
-            for (int i = clone_to; i < temp_len; i++) selected_pos_cnt[i]++;
-
           }
 
           break;
@@ -6647,7 +6658,6 @@ havoc_stage:
 
             break;
 
-            for (int i = 0; i < copy_len; i++) selected_pos_cnt[i+copy_from]++;
 
           }
 
@@ -6672,7 +6682,6 @@ havoc_stage:
               insert_at = select_migrate_pos(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, a_extras[use_extra].data, extra_len);
 
-              for (int i = 0; i < extra_len; i++) selected_pos_cnt[insert_at+i]++;
 
             } else {
 
@@ -6686,8 +6695,6 @@ havoc_stage:
 
               insert_at = select_migrate_pos(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, extras[use_extra].data, extra_len);
-
-              for (int i = 0; i < extra_len; i++) selected_pos_cnt[insert_at+i]++;
 
             }
 
@@ -6742,7 +6749,6 @@ havoc_stage:
             ck_free(out_buf);
             out_buf   = new_buf;
             temp_len += extra_len;
-            for (int i = insert_at; i < temp_len; i++) selected_pos_cnt[i]++; 
 
             break;
 
@@ -6754,6 +6760,7 @@ havoc_stage:
     }
     is_in_havoc = 1;
     seed_len = temp_len;
+    all_havoc_mig_cnt += stack_top;
     if (common_fuzz_stuff(argv, out_buf, temp_len))
     {
       is_in_havoc = 0;
@@ -8323,8 +8330,6 @@ int main(int argc, char** argv) {
     printf("\n****************************\n"
     "Now is in the cycle %d\n"
     "**********************************************\n", cyc_num++);
-
-    memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
 
     u8 skipped_fuzz;
 
