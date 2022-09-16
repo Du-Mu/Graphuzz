@@ -6359,7 +6359,7 @@ havoc_stage:
 
       u32 pos = 0;
 
-      switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
+      switch (UR(11)) {// + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
         case 0:
 
@@ -8320,7 +8320,9 @@ int main(int argc, char** argv) {
   int cyc_num = 0;
   while (1) {
 
-    printf("Now is in the cycle %d", cyc_num);
+    printf("\n****************************\n"
+    "Now is in the cycle %d\n"
+    "**********************************************\n", cyc_num++);
 
     memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
 
@@ -8329,6 +8331,8 @@ int main(int argc, char** argv) {
     cull_queue();
 
     if (!queue_cur) {
+
+      printf("\n\nNow in queue_cur \n\n");
 
       queue_cycle++;
       current_entry     = 0;
