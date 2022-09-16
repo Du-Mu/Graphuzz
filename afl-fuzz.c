@@ -6353,13 +6353,14 @@ havoc_stage:
 
   /* We essentially just do several thousand runs (depending on perf_score)
      where we take the input file and make random stacked tweaks. */
-
+  
   for (stage_cur = 0; stage_cur < stage_max; stage_cur++) {
-
+    
     u32 use_stacking = 1 << (1 + UR(HAVOC_STACK_POW2));
 
     stage_cur_val = use_stacking;
     stack_top = 0;
+
     for (i = 0; i < use_stacking; i++) {
 
       u32 pos = 0;
@@ -8372,9 +8373,9 @@ int main(int argc, char** argv) {
         sync_fuzzers(use_argv);
 
     }
-
+    u64 begin_time = get_cur_time();
     skipped_fuzz = fuzz_one(use_argv);
-
+    printf("\nfuzz_one time: %d\n", get_cur_time()-begin_time);
     if (!stop_soon && sync_id && !skipped_fuzz) {
       
       if (!(sync_interval_cnt++ % SYNC_INTERVAL))
