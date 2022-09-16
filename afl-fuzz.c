@@ -6359,7 +6359,7 @@ havoc_stage:
 
       u32 pos = 0;
 
-      switch (UR(11)) {// + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
+      switch (UR(15 + ((extras_cnt + a_extras_cnt) ? 2 : 0))) {
 
         case 0:
 
