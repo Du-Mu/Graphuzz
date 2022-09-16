@@ -347,7 +347,7 @@ typedef struct
 int seed_len;
 
 int is_in_havoc = 0;
-int is_in_main_cycle = 0;
+
 unsigned int all_havoc_mig_cnt = 0;
 #define SEED_LIMIT 65535
 trace_cnt all_trace_cnt[SEED_LIMIT];
@@ -4859,7 +4859,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   }
 
   /* This handles FAULT_ERROR for us: */
-  if (is_in_havoc && is_in_main_cycle)
+  if (is_in_havoc)
   {
     if (save_if_interesting(argv, out_buf, len, fault))
     {
@@ -8323,7 +8323,7 @@ int main(int argc, char** argv) {
     start_time += 4000;
     if (stop_soon) goto stop_fuzzing;
   }
-  is_in_main_cycle = 1;
+
   int cyc_num = 0;
   while (1) {
 
