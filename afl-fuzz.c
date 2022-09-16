@@ -6749,7 +6749,7 @@ havoc_stage:
           }
 
       }
-      printf("pos = %lu", pos);
+      //printf("pos = %lu", pos);
 
     }
     is_in_havoc = 1;
@@ -8317,8 +8317,10 @@ int main(int argc, char** argv) {
     if (stop_soon) goto stop_fuzzing;
   }
   is_in_main_cycle = 1;
-
+  int cyc_num = 0;
   while (1) {
+
+    printf("Now is in the cycle %d", cyc_num);
 
     memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
 
