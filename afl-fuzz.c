@@ -337,6 +337,9 @@ enum {
   /* 05 */ FAULT_NOBITS
 };
 
+u64 havoc_begin;
+u64 havoc_end;
+
 typedef struct
 {
   unsigned long int fail_cnt;
@@ -6317,6 +6320,7 @@ skip_extras:
    ****************/
 
 havoc_stage:
+  havoc_begin = get_cur_time();
 
   stage_cur_byte = -1;
 
@@ -6746,7 +6750,6 @@ havoc_stage:
             /* Tail */
             memcpy(new_buf + insert_at + extra_len, out_buf + insert_at,
                    temp_len - insert_at);
-
             ck_free(out_buf);
             out_buf   = new_buf;
             temp_len += extra_len;
@@ -6791,6 +6794,8 @@ havoc_stage:
     }
 
   }
+  havoc_end = get_cur_time();// time count
+  printf("\nhavoc_stage: %d", havoc_end-havoc_begin);
 
   new_hit_cnt = queued_paths + unique_crashes;
 
@@ -8373,9 +8378,13 @@ int main(int argc, char** argv) {
         sync_fuzzers(use_argv);
 
     }
-    u64 begin_time = get_cur_time();
+    
+    u64 begin_time = get_cur_time(); // time count
+    u64 havoc_time;
     skipped_fuzz = fuzz_one(use_argv);
-    printf("\nfuzz_one time: %d\n", get_cur_time()-begin_time);
+
+    printf("\nfuzz_one time: %d\n", get_cur_time()-begin_time); //  output time
+
     if (!stop_soon && sync_id && !skipped_fuzz) {
       
       if (!(sync_interval_cnt++ % SYNC_INTERVAL))
