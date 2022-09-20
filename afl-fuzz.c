@@ -6795,7 +6795,7 @@ havoc_stage:
 
   }
   havoc_end = get_cur_time();// time count
-  printf("\nhavoc_stage: %d", havoc_end-havoc_begin);
+  printf("\nhavoc_stage: %lld", havoc_end-havoc_begin);
 
   new_hit_cnt = queued_paths + unique_crashes;
 
@@ -8383,7 +8383,7 @@ int main(int argc, char** argv) {
     u64 havoc_time;
     skipped_fuzz = fuzz_one(use_argv);
 
-    printf("\nfuzz_one time: %d\n", get_cur_time()-begin_time); //  output time
+    printf("\nfuzz_one time: %lld\n", get_cur_time()-begin_time); //  output time
 
     if (!stop_soon && sync_id && !skipped_fuzz) {
       
