@@ -356,6 +356,9 @@ unsigned int all_havoc_mig_cnt = 0;
 trace_cnt all_trace_cnt[SEED_LIMIT];
 unsigned int stack_top = 0;
 unsigned int selected_pos_stack[SEED_LIMIT] = {0};
+u32 selected_migrate_pos_arr[6553][300];
+u32 havoc_queued_discovered = 0;
+u32 arr_flag = 0
 /* Magic numbers */
 #define A 471
 #define B 1586
@@ -498,19 +501,19 @@ double generate_beta(int a, int b)
 
 u32 select_migrate_pos(u32 len)
 {
-  double tmp, res = 0;
-  u32 res_pos = 0;
-
-  for (u32 i = 0; i < len; i++)
+  if (havoc_queued_discovered == 0)
   {
-    if ((tmp = generate_beta(all_trace_cnt[i].suc_cnt, all_trace_cnt[i].fail_cnt)) > res)
-    {
-      res = tmp;
-      res_pos = i;
-    }
+    return UR(len);
   }
+  else 
+  {
+    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag++][0]*2);
+    if (temp >= len)
+      return (selected_migrate_pos_arr[arr_flag][temp-len+1] < len ?
+      selected_migrate_pos_arr[arr_flag][temp-len+1] : UR(len));
+    else return temp;
 
-  return res_pos;
+  }
 }
 
 
@@ -4867,24 +4870,11 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     if (save_if_interesting(argv, out_buf, len, fault))
     {
       queued_discovered++;
-      while (stack_top > 0)
-      {
-        all_trace_cnt[selected_pos_stack[stack_top--]].suc_cnt ++; 
-      }
+      memcpy(((u32 *)selected_migrate_pos_arr[havoc_queued_discovered])+1, selected_pos_stack, stack_top*sizeof(u32));
+      selected_migrate_pos_arr[havoc_queued_discovered][0] = stack_top;
+      havoc_queued_discovered++;
+      stack_top = 0;
     }
-    else
-      while (stack_top > 0)
-      {
-        all_trace_cnt[selected_pos_stack[stack_top--]].fail_cnt ++;
-      }
-    /*
-    memset(selected_pos_cnt, 0, sizeof(int)*SEED_LIMIT);
-    for (int i = 0; i < seed_len; i++)
-    {
-      printf("suc=%lu fail=%lu\t", all_trace_cnt[i].suc_cnt,all_trace_cnt[i].fail_cnt);
-    }
-    putchar('\n');
-    */
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
@@ -6383,9 +6373,9 @@ havoc_stage:
         case 0:
 
           /* Flip a single bit somewhere. Spooky! */
-          pos = select_migrate_pos(temp_len<<3);
-          selected_pos_stack[stack_top++] = pos>>3;
-          FLIP_BIT(out_buf, pos);
+          pos = select_migrate_pos(temp_len);
+          selected_pos_stack[stack_top++] = pos;
+          FLIP_BIT(out_buf, (pos<<3) + UR(8));
           break;
 
         case 1: 
@@ -6578,7 +6568,7 @@ havoc_stage:
 
             del_len = choose_block_len(temp_len - 1);
 
-            del_from = select_migrate_pos(temp_len - del_len + 1);
+            del_from = UR(temp_len - del_len + 1);
 
             memmove(out_buf + del_from, out_buf + del_from + del_len,
                     temp_len - del_from - del_len);
@@ -6602,7 +6592,7 @@ havoc_stage:
             if (actually_clone) {
 
               clone_len  = choose_block_len(temp_len);
-              clone_from = select_migrate_pos(temp_len - clone_len + 1);
+              clone_from = UR(temp_len - clone_len + 1);
 
             } else {
 
@@ -6650,7 +6640,7 @@ havoc_stage:
 
             copy_len  = choose_block_len(temp_len - 1);
 
-            copy_from = select_migrate_pos(temp_len - copy_len + 1);
+            copy_from = UR(temp_len - copy_len + 1);
             copy_to   = UR(temp_len - copy_len + 1);
 
             if (UR(4)) {
@@ -6684,7 +6674,7 @@ havoc_stage:
 
               if (extra_len > temp_len) break;
 
-              insert_at = select_migrate_pos(temp_len - extra_len + 1);
+              insert_at = UR(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, a_extras[use_extra].data, extra_len);
 
 
@@ -6698,7 +6688,7 @@ havoc_stage:
 
               if (extra_len > temp_len) break;
 
-              insert_at = select_migrate_pos(temp_len - extra_len + 1);
+              insert_at = UR(temp_len - extra_len + 1);
               memcpy(out_buf + insert_at, extras[use_extra].data, extra_len);
 
             }
@@ -6709,7 +6699,7 @@ havoc_stage:
 
         case 16: {
 
-            u32 use_extra, extra_len, insert_at = select_migrate_pos(temp_len + 1);
+            u32 use_extra, extra_len, insert_at = UR(temp_len + 1);
             u8* new_buf;
 
             /* Insert an extra. Do the same dice-rolling stuff as for the
