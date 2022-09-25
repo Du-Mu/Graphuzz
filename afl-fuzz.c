@@ -358,7 +358,7 @@ unsigned int stack_top = 0;
 unsigned int selected_pos_stack[SEED_LIMIT] = {0};
 u32 selected_migrate_pos_arr[6553][300];
 u32 havoc_queued_discovered = 0;
-u32 arr_flag = 0
+u32 arr_flag = 0;
 /* Magic numbers */
 #define A 471
 #define B 1586
@@ -499,24 +499,6 @@ double generate_beta(int a, int b)
 }
 
 
-u32 select_migrate_pos(u32 len)
-{
-  if (havoc_queued_discovered == 0)
-  {
-    return UR(len);
-  }
-  else 
-  {
-    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag++][0]*2);
-    if (temp >= len)
-      return (selected_migrate_pos_arr[arr_flag][temp-len+1] < len ?
-      selected_migrate_pos_arr[arr_flag][temp-len+1] : UR(len));
-    else return temp;
-
-  }
-}
-
-
 /* Get unix time in milliseconds */
 
 static u64 get_cur_time(void) {
@@ -565,6 +547,22 @@ static inline u32 UR(u32 limit) {
 
 }
 
+u32 select_migrate_pos(u32 len)
+{
+  if (havoc_queued_discovered == 0)
+  {
+    return UR(len);
+  }
+  else 
+  {
+    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag++][0]*2);
+    if (temp >= len)
+      return (selected_migrate_pos_arr[arr_flag][temp-len+1] < len ?
+      selected_migrate_pos_arr[arr_flag][temp-len+1] : UR(len));
+    else return temp;
+
+  }
+}
 
 /* Shuffle an array of pointers. Might be slightly biased. */
 
@@ -8370,7 +8368,6 @@ int main(int argc, char** argv) {
     }
     
     u64 begin_time = get_cur_time(); // time count
-    u64 havoc_time;
     skipped_fuzz = fuzz_one(use_argv);
 
     printf("\nfuzz_one time: %lld\n", get_cur_time()-begin_time); //  output time
