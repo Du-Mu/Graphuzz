@@ -555,11 +555,15 @@ u32 select_migrate_pos(u32 len)
   }
   else 
   {
-    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag++][0]*2);
+    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag][0]*2);
     if (temp >= len)
+    {
       return (selected_migrate_pos_arr[arr_flag][temp-len+1] < len ?
       selected_migrate_pos_arr[arr_flag][temp-len+1] : UR(len));
+    }
     else return temp;
+
+    arr_flag =  arr_flag >= havoc_queued_discovered-1 ? 0 : arr_flag+1;
 
   }
 }
