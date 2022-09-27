@@ -389,7 +389,7 @@ void init_pos_arr()
 
 void init_all_trace_cnt()
 {
-  for (int i = 0; i < SEED_LIMIT; i++)
+  for (int i = 0; i < 100; i++)
   {
     all_arr_trace_cnt[i].fail_cnt = 100;
     all_arr_trace_cnt[i].suc_cnt = 10;
@@ -472,59 +472,7 @@ gfsr4_set (void *vstate, unsigned long int s)
 
   state->nd = i;
 }
-void cull_arr_queue()
-{
-  u32 *pr_arr[51];
-  double rand_arr[51];
-  double temp_rand;
-  u32 *temp_p;
-  for (int i = 0; i < 50; i++)
-  {
-    pr_arr[i] = selected_migrate_pos_arr[i];
-    rand_arr[i] = generate_beta(all_arr_trace_cnt[i].suc_cnt, all_arr_trace_cnt[i].fail_cnt);
-    for (int j = i; j > 0; j--)
-    {
-      if (rand_arr[j-1] < rand_arr[j])
-      {
-        temp_rand = rand_arr[j-1];
-        rand_arr[j-1] = rand_arr[j];
-        rand_arr[j] = rand_arr[j-1];
-        temp_p = pr_arr[j-1];
-        pr_arr[j-1] = pr_arr[j];
-        pr_arr[j] = pr_arr[j-1];
-      }
-      else
-        break;
-    }
-  }
-  for (int i = 0; i < 50; i++)
-  {
-    pr_arr[50] = selected_migrate_pos_arr[i];
-    rand_arr[50] = generate_beta(all_arr_trace_cnt[i+50].suc_cnt, all_arr_trace_cnt[i+50].fail_cnt);
-    for (int j = 50; j > 0; j--)
-    {
-      if (rand_arr[j-1] < rand_arr[j])
-      {
-        temp_rand = rand_arr[j-1];
-        rand_arr[j-1] = rand_arr[j];
-        rand_arr[j] = rand_arr[j-1];
-        temp_p = pr_arr[j-1];
-        pr_arr[j-1] = pr_arr[j];
-        pr_arr[j] = pr_arr[j-1];
-      }
-      else
-        break;
-    }
-    free(pr_arr[50]);
-  }
-  havoc_queued_discovered = 50;
-  arr_flag = 0;
 
-  memcpy(selected_migrate_pos_arr, pr_arr, sizeof(u32*)*50);
-  for (int i = 0; i < 50; i++)
-    selected_migrate_pos_arr[50+i] = (u32*)malloc(sizeof(u32)*4000);
-  init_all_trace_cnt();
-}
 
 double generate_gamma(int num)
 {
@@ -560,6 +508,60 @@ double generate_beta(int a, int b)
 	return gamma_1/(gamma_1+gamma_2);
 }
 
+
+void cull_arr_queue()
+{
+  u32 *pr_arr[51] = {0};
+  double rand_arr[51] = {0};
+  double temp_use_rand = 0;
+  u32 *temp_use_p = 0;
+  for (int i = 0; i < 50; i++)
+  {
+    pr_arr[i] = selected_migrate_pos_arr[i];
+    rand_arr[i] = generate_beta(all_arr_trace_cnt[i].suc_cnt, all_arr_trace_cnt[i].fail_cnt);
+    for (int j = i; j > 0; j--)
+    {
+      if (rand_arr[j-1] < rand_arr[j])
+      {
+        temp_use_rand = rand_arr[j-1];
+        rand_arr[j-1] = rand_arr[j];
+        rand_arr[j] = temp_use_rand;
+        temp_use_p = pr_arr[j-1];
+        pr_arr[j-1] = pr_arr[j];
+        pr_arr[j] = temp_use_p;
+      }
+      else
+        break;
+    }
+  }
+  for (int i = 0; i < 50; i++)
+  {
+    pr_arr[50] = selected_migrate_pos_arr[i];
+    rand_arr[50] = generate_beta(all_arr_trace_cnt[i+50].suc_cnt, all_arr_trace_cnt[i+50].fail_cnt);
+    for (int j = 50; j > 0; j--)
+    {
+      if (rand_arr[j-1] < rand_arr[j])
+      {
+        temp_use_rand = rand_arr[j-1];
+        rand_arr[j-1] = rand_arr[j];
+        rand_arr[j] = temp_use_rand;
+        temp_use_p = pr_arr[j-1];
+        pr_arr[j-1] = pr_arr[j];
+        pr_arr[j] = temp_use_p;
+      }
+      else
+        break;
+    }
+    free(pr_arr[50]);
+  }
+  havoc_queued_discovered = 50;
+  arr_flag = 0;
+
+  memcpy(selected_migrate_pos_arr, pr_arr, sizeof(u32*)*50);
+  for (int i = 0; i < 50; i++)
+    selected_migrate_pos_arr[50+i] = (u32*)malloc(sizeof(u32)*4000);
+  init_all_trace_cnt();
+}
 
 /* Get unix time in milliseconds */
 
@@ -621,8 +623,8 @@ u32 select_migrate_pos(u32 len)
     if (temp >= len)
     {
       temp = temp % len;
-      return ((selected_migrate_pos_arr[arr_flag]+temp+1) < len ?
-      (selected_migrate_pos_arr[arr_flag]+temp+1) : UR(len));
+      return (*(selected_migrate_pos_arr[arr_flag]+temp+1) < len ?
+      *(selected_migrate_pos_arr[arr_flag]+temp+1) : UR(len));
     }
     else return temp;
   }
