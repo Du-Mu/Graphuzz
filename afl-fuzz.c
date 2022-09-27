@@ -351,14 +351,16 @@ int seed_len;
 
 int is_in_havoc = 0;
 
-unsigned int all_havoc_mig_cnt = 0;
 #define SEED_LIMIT 65535
-trace_cnt all_trace_cnt[SEED_LIMIT];
+
+unsigned int all_havoc_mig_cnt = 0;
 unsigned int stack_top = 0;
 unsigned int selected_pos_stack[SEED_LIMIT] = {0};
-u32 selected_migrate_pos_arr[6553][300];
+u32 *selected_migrate_pos_arr[100];
+trace_cnt all_arr_trace_cnt[100];
 u32 havoc_queued_discovered = 0;
 u32 arr_flag = 0;
+
 /* Magic numbers */
 #define A 471
 #define B 1586
@@ -377,13 +379,20 @@ gfsr4_state_t;
 
 gfsr4_state_t *rng_state;
 
+void init_pos_arr()
+{
+  for (int i = 0; i < 100; i++)
+  {
+    selected_migrate_pos_arr[i] = (u32 *)malloc(sizeof(u32)*4000);
+  }
+}
 
 void init_all_trace_cnt()
 {
   for (int i = 0; i < SEED_LIMIT; i++)
   {
-    all_trace_cnt[i].fail_cnt = 100;
-    all_trace_cnt[i].suc_cnt = 10;
+    all_arr_trace_cnt[i].fail_cnt = 100;
+    all_arr_trace_cnt[i].suc_cnt = 10;
   }
 }
 
@@ -462,6 +471,59 @@ gfsr4_set (void *vstate, unsigned long int s)
   }
 
   state->nd = i;
+}
+void cull_arr_queue()
+{
+  u32 *pr_arr[51];
+  double rand_arr[51];
+  double temp_rand;
+  u32 *temp_p;
+  for (int i = 0; i < 50; i++)
+  {
+    pr_arr[i] = selected_migrate_pos_arr[i];
+    rand_arr[i] = generate_beta(all_arr_trace_cnt[i].suc_cnt, all_arr_trace_cnt[i].fail_cnt);
+    for (int j = i; j > 0; j--)
+    {
+      if (rand_arr[j-1] < rand_arr[j])
+      {
+        temp_rand = rand_arr[j-1];
+        rand_arr[j-1] = rand_arr[j];
+        rand_arr[j] = rand_arr[j-1];
+        temp_p = pr_arr[j-1];
+        pr_arr[j-1] = pr_arr[j];
+        pr_arr[j] = pr_arr[j-1];
+      }
+      else
+        break;
+    }
+  }
+  for (int i = 0; i < 50; i++)
+  {
+    pr_arr[50] = selected_migrate_pos_arr[i];
+    rand_arr[50] = generate_beta(all_arr_trace_cnt[i+50].suc_cnt, all_arr_trace_cnt[i+50].fail_cnt);
+    for (int j = 50; j > 0; j--)
+    {
+      if (rand_arr[j-1] < rand_arr[j])
+      {
+        temp_rand = rand_arr[j-1];
+        rand_arr[j-1] = rand_arr[j];
+        rand_arr[j] = rand_arr[j-1];
+        temp_p = pr_arr[j-1];
+        pr_arr[j-1] = pr_arr[j];
+        pr_arr[j] = pr_arr[j-1];
+      }
+      else
+        break;
+    }
+    free(pr_arr[50]);
+  }
+  havoc_queued_discovered = 50;
+  arr_flag = 0;
+
+  memcpy(selected_migrate_pos_arr, pr_arr, sizeof(u32*)*50);
+  for (int i = 0; i < 50; i++)
+    selected_migrate_pos_arr[50+i] = (u32*)malloc(sizeof(u32)*4000);
+  init_all_trace_cnt();
 }
 
 double generate_gamma(int num)
@@ -555,16 +617,14 @@ u32 select_migrate_pos(u32 len)
   }
   else 
   {
-    u32 temp = UR(len+selected_migrate_pos_arr[arr_flag][0]*2);
+    u32 temp = UR(len+(*selected_migrate_pos_arr[arr_flag])*2);
     if (temp >= len)
     {
-      return (selected_migrate_pos_arr[arr_flag][temp-len+1] < len ?
-      selected_migrate_pos_arr[arr_flag][temp-len+1] : UR(len));
+      temp = temp % len;
+      return ((selected_migrate_pos_arr[arr_flag]+temp+1) < len ?
+      (selected_migrate_pos_arr[arr_flag]+temp+1) : UR(len));
     }
     else return temp;
-
-    arr_flag =  arr_flag >= havoc_queued_discovered-1 ? 0 : arr_flag+1;
-
   }
 }
 
@@ -4869,14 +4929,25 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   /* This handles FAULT_ERROR for us: */
   if (is_in_havoc)
   {
+
+    if (havoc_queued_discovered >= 99)
+        cull_arr_queue();
+
     if (save_if_interesting(argv, out_buf, len, fault))
     {
       queued_discovered++;
       memcpy(((u32 *)selected_migrate_pos_arr[havoc_queued_discovered])+1, selected_pos_stack, stack_top*sizeof(u32));
-      selected_migrate_pos_arr[havoc_queued_discovered][0] = stack_top;
+      *selected_migrate_pos_arr[havoc_queued_discovered] = stack_top;
       havoc_queued_discovered++;
       stack_top = 0;
+      all_arr_trace_cnt[arr_flag].suc_cnt++;
     }
+    else
+    {
+      all_arr_trace_cnt[arr_flag].fail_cnt++;
+    }
+
+    arr_flag =  arr_flag >= havoc_queued_discovered-1 ? 0 : arr_flag+1;
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
@@ -8272,10 +8343,11 @@ int main(int argc, char** argv) {
   setup_post();
   setup_shm();
   init_count_class16();
+  init_pos_arr();
+  init_all_trace_cnt();
 
   rng_state = calloc(1, sizeof(gfsr4_state_t));
   gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
-  init_all_trace_cnt();
 
 
   setup_dirs_fds();
