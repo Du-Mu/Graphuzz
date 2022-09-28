@@ -4948,8 +4948,8 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
     {
       all_arr_trace_cnt[arr_flag].fail_cnt++;
     }
-
-    arr_flag =  arr_flag >= havoc_queued_discovered-1 ? 0 : arr_flag+1;
+    if (havoc_queued_discovered >= 2)
+      arr_flag =  arr_flag >= havoc_queued_discovered-1 ? 0 : arr_flag+1;
   }
   else
     queued_discovered += save_if_interesting(argv, out_buf, len, fault);
