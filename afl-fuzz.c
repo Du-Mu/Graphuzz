@@ -383,7 +383,7 @@ void init_pos_arr()
 {
   for (int i = 0; i < 100; i++)
   {
-    selected_migrate_pos_arr[i] = (u32 *)malloc(sizeof(u32)*4000);
+    selected_migrate_pos_arr[i] = (u32 *)malloc(sizeof(u32)*100);
   }
 }
 
@@ -559,7 +559,7 @@ void cull_arr_queue()
 
   memcpy(selected_migrate_pos_arr, pr_arr, sizeof(u32*)*50);
   for (int i = 0; i < 50; i++)
-    selected_migrate_pos_arr[50+i] = (u32*)malloc(sizeof(u32)*4000);
+    selected_migrate_pos_arr[50+i] = (u32*)malloc(sizeof(u32)*100);
   init_all_trace_cnt();
 }
 
@@ -622,7 +622,7 @@ u32 select_migrate_pos(u32 len)
     u32 temp = UR(len+(*selected_migrate_pos_arr[arr_flag])*2);
     if (temp >= len)
     {
-      temp = temp % len;
+      temp = (temp - len) % (*selected_migrate_pos_arr[arr_flag]);
       return (*(selected_migrate_pos_arr[arr_flag]+temp+1) < len ?
       *(selected_migrate_pos_arr[arr_flag]+temp+1) : UR(len));
     }
@@ -4932,7 +4932,7 @@ EXP_ST u8 common_fuzz_stuff(char** argv, u8* out_buf, u32 len) {
   if (is_in_havoc)
   {
 
-    if (havoc_queued_discovered >= 99)
+    if (havoc_queued_discovered > (u32)99)
         cull_arr_queue();
 
     if (save_if_interesting(argv, out_buf, len, fault))
@@ -8347,6 +8347,7 @@ int main(int argc, char** argv) {
   init_count_class16();
   init_pos_arr();
   init_all_trace_cnt();
+
 
   rng_state = calloc(1, sizeof(gfsr4_state_t));
   gfsr4_set(rng_state, tv.tv_sec ^ tv.tv_usec ^ getpid());
