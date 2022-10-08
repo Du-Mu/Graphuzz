@@ -619,7 +619,7 @@ u32 select_migrate_pos(u32 len)
   }
   else 
   {
-    u32 temp = UR(len+(*selected_migrate_pos_arr[arr_flag])*2);
+    u32 temp = UR(len+(*selected_migrate_pos_arr[arr_flag])*7);
     if (temp >= len)
     {
       temp = (temp - len) % (*selected_migrate_pos_arr[arr_flag]);
